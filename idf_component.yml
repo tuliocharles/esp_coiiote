@@ -10,8 +10,6 @@ maintainers:
 
 dependencies:
   idf: ">=5.4"
-  protocol_examples_common:
-    path: ${IDF_PATH}/examples/common_components/protocol_examples_common
   espressif/esp_wifi_remote:
     version: ">=0.1.12"
     rules:

@@ -12,3 +12,5 @@ dependencies:
       - if: "target in [esp32p4, esp32h2]"
   tuliocharles/esp_wifi_interface:
       version: '*'
+  tuliocharles/esp_mqtt_interface:
+      version: '*'

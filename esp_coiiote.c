@@ -128,8 +128,6 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
     return ESP_OK;
 }
 
-
-
 static char* mac_bytes_to_hexstr(const uint8_t mac[6], char out_str[13])
 {
     for (int i = 0; i < 6; ++i) {
@@ -160,7 +158,6 @@ static void get_mac_adress(void)
     mac_bytes_to_hexstr(mac, esp_coiite_handle->mac_str);
     ESP_LOGI(tag_coiiote, "MAC de fábrica (EFUSE_FACTORY) em string: %s\n", mac_str);
 }
-
 
 esp_err_t esp_coiiote_init(esp_coiiote_config_t *config)
 {
@@ -228,7 +225,6 @@ err:
     return ret;
 }
 
-
 void esp_coiiote_debug(){
     ESP_LOGI(tag_coiiote, "Esp-coiiote debug");
     ESP_LOGI(tag_coiiote, "Esp-coiiote NVS handle: %p", esp_coiite_handle->nvs_coiiote_handle);
@@ -240,7 +236,6 @@ void esp_coiiote_debug(){
     ESP_LOGI(tag_coiiote, "Esp-coiiote server: %s", esp_coiite_handle->server);
     ESP_LOGI(tag_coiiote, "Esp-coiiote port: %lu", esp_coiite_handle->port);
 }
-
 
 void http_rest_with_hostname_path(void)
 {
@@ -304,7 +299,6 @@ void http_rest_with_hostname_path(void)
     esp_http_client_cleanup(client);
 }
  
-
 void esp_coiiote_access(){
     // POST
     char post_data[400];
@@ -371,3 +365,44 @@ void func(void){
     ESP_LOGI(tag_coiiote, "End of func!\n");
 }
 
+
+
+// FUNÇÃO QUE RETORNA O MAC_STRING
+char* esp_coiiote_get_mac_str(void)
+{
+    if (esp_coiite_handle == NULL) {
+        ESP_LOGE(tag_coiiote, "Esp-coiiote handle is NULL");
+        return NULL;
+    }
+    return esp_coiite_handle->mac_str;
+}
+
+// FUNÇÃO QUE RETORNA O PASSWORD DO THING
+uint8_t* esp_coiiote_get_thing_password(void)
+{
+    if (esp_coiite_handle == NULL) {
+        ESP_LOGE(tag_coiiote, "Esp-coiiote handle is NULL");
+        return NULL;
+    }
+    return esp_coiite_handle->thingpassword;
+}
+
+// função que retorna o workspace 
+uint8_t* esp_coiiote_get_workspace(void)
+{
+    if (esp_coiite_handle == NULL) {
+        ESP_LOGE(tag_coiiote, "Esp-coiiote handle is NULL");
+        return NULL;
+    }
+    return esp_coiite_handle->workspace;
+}
+
+// função que retorna thingname
+uint8_t* esp_coiiote_get_thingname(void)
+{
+    if (esp_coiite_handle == NULL) {
+        ESP_LOGE(tag_coiiote, "Esp-coiiote handle is NULL");
+        return NULL;
+    }
+    return esp_coiite_handle->thingname;
+}

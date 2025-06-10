@@ -1,10 +1,42 @@
 #include <stdio.h>
 #include "esp_coiiote.h"
 #include "esp_wifi_interface.h"
+#include "esp_mqtt_interface.h"
 
-#define LED_STATUS 2 // GPIO pin for status LED
-#define LED_RESET 0 // GPIO pin for reset
+#define LED_STATUS 2 
+#define LED_RESET 0 
+#define HOST     "coiiote.com"
 
+static void evento_mqtt(uint32_t received_id,  const char *topic,  const char *data){
+    
+    switch((esp_mqtt_event_id_t)received_id) {
+        case MQTT_EVENT_CONNECTED:
+            ESP_LOGI("MQTT_EVENT", "Conectado ao broker MQTT");
+            esp_mqtt_interface_subscribe("TOPIC_TO_SUBSCRIBE", 0); // Inscreve-se no tópico para receber mensagens
+            break;
+        case MQTT_EVENT_DISCONNECTED:
+            ESP_LOGI("MQTT_EVENT", "Desconectado do broker MQTT");
+            break;
+        case MQTT_EVENT_SUBSCRIBED:
+            ESP_LOGI("MQTT_EVENT", "Inscrito no tópico: %s", topic);
+            break;
+        case MQTT_EVENT_UNSUBSCRIBED:
+            ESP_LOGI("MQTT_EVENT", "Desinscrito do tópico: %s", topic);
+            break;
+        case MQTT_EVENT_PUBLISHED:
+            ESP_LOGI("MQTT_EVENT", "Publicado no tópico: %s", topic);
+            break;
+        case MQTT_EVENT_DATA:
+            ESP_LOGI("MQTT_EVENT", "Dados recebidos no tópico: %s, Dados: %s", topic, data);
+            break;
+        case MQTT_EVENT_ERROR:
+            ESP_LOGE("MQTT_EVENT", "Erro no evento MQTT");
+            break;
+        default:
+            ESP_LOGI("MQTT_EVENT", "Outro evento: %lu", received_id);
+    }
+
+}
 
 static void http_test_task(void *pvParameters)
 {
@@ -12,13 +44,12 @@ static void http_test_task(void *pvParameters)
     esp_coiiote_access(); // Send data to CoIIoTe server
     
     vTaskDelete(NULL); // Delete the task after completion
-}
+    }
 
 
 void app_main(void)
 {
 
-    // connect to wi-fi network using esp_wifi_interface
     esp_wifi_interface_config_t wifi_inteface_config = {
         .channel = 1, // Access point channel
         .esp_max_retry = 5, // Maximum number of retries to connect to the AP         
@@ -27,37 +58,46 @@ void app_main(void)
         .status_io = LED_STATUS,  // Connection status. 
         .reset_io = LED_RESET,           // Reset pin.
     };
-    
     WiFiInit (&wifi_inteface_config);
-
     WiFiSimpleConnection();
 
-    // connect to coiiote server
     esp_coiiote_config_t coiiote_config = {
-        .server = "coiiote.com", //"192.168.1.12", // Coiiote server address
-        .port = 80, //3000, // Coiiote server port
-        .nvs_coiiote_handle = esp_wifi_get_coiiote_nvs_handle(), // Coiiote handle
+        .server = HOST, 
+        .port = 80, 
+        .nvs_coiiote_handle = esp_wifi_get_coiiote_nvs_handle(), 
+    };
+    esp_coiiote_init(&coiiote_config); 
+    
+
+    esp_mqtt_interface_config_t client_mqtt = {
+        .host = HOST, 
+        .port = 1883, 
+        .username = esp_coiiote_get_mac_str(), 
+        .password = (char *)esp_coiiote_get_thing_password(), 
+        .id = esp_coiiote_get_mac_str(),
     };
 
-    esp_coiiote_init(&coiiote_config); // Initialize Coiiote
-    
-    // trazer o outro exemplo pra cá.
-        
-    // create or log in to coiiote account
+    esp_mqtt_interface_init(&client_mqtt); 
+    esp_mqtt_interface_register_cb(evento_mqtt); 
 
-    // connect to coiiote mqtt broker
-
-    // starts to send and receive data to and from coiiote
-    func();
-
-    esp_coiiote_debug(); // Debugging function to check the status of the coiiote connection
-
+    esp_coiiote_debug(); 
     xTaskCreate(&http_test_task, "http_test_task", 8192, NULL, 5, NULL);
 
+    uint64_t cont = 0; // Counter for the number of messages sent
+    
     while(1){
+
         vTaskDelay(1000 / portTICK_PERIOD_MS);
         esp_wifi_check_reset_button();
         
+        cont++;     
+        char topic[100];
+        snprintf(topic, sizeof(topic), "%s/%s/Time", 
+                 (char *)esp_coiiote_get_workspace(),
+                 (char *)esp_coiiote_get_thingname() ); // Construct the topic using MAC address, thing name, and workspace
+        char data[50];
+        snprintf(data, sizeof(data), "%llu seconds", cont); 
+        esp_mqtt_interface_publish(topic, data, 0, 0); 
     }
 
 }

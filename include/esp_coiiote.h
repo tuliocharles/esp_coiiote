@@ -25,4 +25,12 @@ void http_rest_with_hostname_path(void);
 
 void esp_coiiote_access(void); // Send data to CoIIoTe server
 
+char* esp_coiiote_get_mac_str(void);
+
+uint8_t* esp_coiiote_get_thing_password(void);
+
+uint8_t* esp_coiiote_get_workspace(void);
+
+uint8_t* esp_coiiote_get_thingname(void);
+
 #endif
