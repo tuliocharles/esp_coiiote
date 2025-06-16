@@ -46,7 +46,6 @@ static void http_test_task(void *pvParameters)
     vTaskDelete(NULL); // Delete the task after completion
     }
 
-
 void app_main(void)
 {
 
@@ -68,7 +67,6 @@ void app_main(void)
     };
     esp_coiiote_init(&coiiote_config); 
     
-
     esp_mqtt_interface_config_t client_mqtt = {
         .host = HOST, 
         .port = 1883, 
@@ -76,11 +74,10 @@ void app_main(void)
         .password = (char *)esp_coiiote_get_thing_password(), 
         .id = esp_coiiote_get_mac_str(),
     };
-
     esp_mqtt_interface_init(&client_mqtt); 
     esp_mqtt_interface_register_cb(evento_mqtt); 
-
     esp_coiiote_debug(); 
+
     xTaskCreate(&http_test_task, "http_test_task", 8192, NULL, 5, NULL);
 
     uint64_t cont = 0; // Counter for the number of messages sent

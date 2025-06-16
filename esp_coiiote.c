@@ -237,6 +237,7 @@ void esp_coiiote_debug(){
     ESP_LOGI(tag_coiiote, "Esp-coiiote port: %lu", esp_coiite_handle->port);
 }
 
+/*
 void http_rest_with_hostname_path(void)
 {
     char local_response_buffer[MAX_HTTP_OUTPUT_BUFFER + 1] = {0};
@@ -298,6 +299,7 @@ void http_rest_with_hostname_path(void)
 
     esp_http_client_cleanup(client);
 }
+*/
  
 void esp_coiiote_access(){
     // POST
@@ -358,14 +360,6 @@ void esp_coiiote_access(){
     esp_http_client_cleanup(client);
 
 }
-
-void func(void){
-    ESP_LOGI(tag_coiiote, "Hello from func!\n");
-    
-    ESP_LOGI(tag_coiiote, "End of func!\n");
-}
-
-
 
 // FUNÇÃO QUE RETORNA O MAC_STRING
 char* esp_coiiote_get_mac_str(void)

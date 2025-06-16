@@ -15,8 +15,6 @@ typedef struct esp_coiiote_config_t
     esp_nvs_handle_t nvs_coiiote_handle; // Coiiote handle
 } esp_coiiote_config_t;
 
-void func(void);
-
 esp_err_t esp_coiiote_init(esp_coiiote_config_t *config);
 
 void esp_coiiote_debug();
