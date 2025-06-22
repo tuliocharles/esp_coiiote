@@ -81,6 +81,7 @@ void app_main(void)
     xTaskCreate(&http_test_task, "http_test_task", 8192, NULL, 5, NULL);
 
     uint64_t cont = 0; // Counter for the number of messages sent
+
     
     while(1){
 
