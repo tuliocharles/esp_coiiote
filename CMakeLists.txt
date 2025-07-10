@@ -1,7 +1,7 @@
 idf_component_register(SRCS "esp_coiiote.c"
                     INCLUDE_DIRS "include"
-                    EMBED_TXTFILES "server_certs/ca_cert.pem"
-                     PRIV_REQUIRES
+                    EMBED_TXTFILES "coiiote_cert.pem"
+                    PRIV_REQUIRES
                         #nvs_flash
                         #esp_event
                         #esp_netif

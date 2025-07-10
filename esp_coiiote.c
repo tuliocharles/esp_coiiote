@@ -14,8 +14,13 @@
 #include "esp_http_client.h"
 #include "esp_https_ota.h"
 
-extern const uint8_t server_cert_pem_start[] asm("_binary_ca_cert_pem_start");
-extern const uint8_t server_cert_pem_end[] asm("_binary_ca_cert_pem_end");
+#include "esp_crt_bundle.h"
+
+//extern const uint8_t server_cert_pem_start[] asm("_binary_ca_cert_pem_start");
+//extern const uint8_t server_cert_pem_end[] asm("_binary_ca_cert_pem_end");
+
+extern const char coiiote_cert_pem_start[] asm("_binary_coiiote_cert_pem_start");
+extern const char coiiote_cert_pem_end[]   asm("_binary_coiiote_cert_pem_end");
 
 // #define MAX_HTTP_RECV_BUFFER 512
 #define MAX_HTTP_OUTPUT_BUFFER 2048
@@ -28,12 +33,12 @@ struct esp_coiiote_t
     uint8_t server[64];                  // Coiiote server address
     uint32_t port;                       // Coiiote server port
     char mac_str[13];                    // MAC address
-    uint8_t thingid[64];                 // Coiiote client ID
+    uint8_t thingid[256];                 // Coiiote client ID
     uint8_t thingpassword[64];           // Coiiote username
     uint8_t thingname[64];               // Coiiote password
     uint8_t workspace[64];               // Coiiote workspace
     gpio_num_t status_io;
-    gpio_num_t reset_io;
+        gpio_num_t reset_io;
 };
 
 static esp_coiiote_handle_t esp_coiite_handle = NULL;
@@ -208,7 +213,7 @@ static void get_mac_adress(void)
     mac_bytes_to_hexstr(mac, esp_coiite_handle->mac_str);
     ESP_LOGI(tag_coiiote, "MAC de fábrica (EFUSE_FACTORY) em string: %s\n", mac_str);
 }
-
+    
 esp_err_t esp_coiiote_init(esp_coiiote_config_t *config)
 {
     esp_err_t ret = ESP_OK;
@@ -291,7 +296,7 @@ void esp_coiiote_debug()
 void esp_coiiote_access()
 {
     // POST
-    char post_data[400];
+    char post_data[800];
 
     snprintf(post_data, sizeof(post_data),
              "{"
@@ -321,9 +326,11 @@ void esp_coiiote_access()
         //.host = "192.168.1.12", //CONFIG_EXAMPLE_HTTP_ENDPOINT,
         //.port = 3000,
         .path = post_path,
-        .transport_type = HTTP_TRANSPORT_OVER_TCP,
+        .transport_type = HTTP_TRANSPORT_OVER_SSL, //HTTP_TRANSPORT_OVER_TCP,
         .user_data = local_response_buffer,
         .event_handler = _http_event_handler,
+        .cert_pem        = coiiote_cert_pem_start,
+
     };
     esp_http_client_handle_t client = esp_http_client_init(&config);
 
@@ -397,7 +404,7 @@ void esp_coiiote_ota(const char *url)
     // começa aqui a parte de OTA
     esp_http_client_config_t config = {
         .url = url,
-        .cert_pem = (char *)server_cert_pem_start,
+        .cert_pem = (char *)coiiote_cert_pem_start, 
         .event_handler = _http_event_handler_ota,
         .keep_alive_enable = true,
     };
