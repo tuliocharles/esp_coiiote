@@ -16,11 +16,21 @@
 
 #include "esp_crt_bundle.h"
 
-//extern const uint8_t server_cert_pem_start[] asm("_binary_ca_cert_pem_start");
-//extern const uint8_t server_cert_pem_end[] asm("_binary_ca_cert_pem_end");
+#include "protocol_examples_utils.h"
+#include "esp_tls_crypto.h"
+#include <esp_http_server.h>
+
+#include "esp_event.h"
+#include "esp_netif.h"
+#include "esp_wifi.h"
+
+#define EXAMPLE_HTTP_QUERY_KEY_MAX_LEN (64)
+
+// extern const uint8_t server_cert_pem_start[] asm("_binary_ca_cert_pem_start");
+// extern const uint8_t server_cert_pem_end[] asm("_binary_ca_cert_pem_end");
 
 extern const char coiiote_cert_pem_start[] asm("_binary_coiiote_cert_pem_start");
-extern const char coiiote_cert_pem_end[]   asm("_binary_coiiote_cert_pem_end");
+extern const char coiiote_cert_pem_end[] asm("_binary_coiiote_cert_pem_end");
 
 // #define MAX_HTTP_RECV_BUFFER 512
 #define MAX_HTTP_OUTPUT_BUFFER 2048
@@ -30,15 +40,16 @@ typedef struct esp_coiiote_t esp_coiiote_t;
 struct esp_coiiote_t
 {
     esp_nvs_handle_t nvs_coiiote_handle; // NVS handle for CoIIoTe
+    httpd_handle_t web_server;           // Handle of the web server
     uint8_t server[64];                  // Coiiote server address
     uint32_t port;                       // Coiiote server port
     char mac_str[13];                    // MAC address
-    uint8_t thingid[256];                 // Coiiote client ID
+    uint8_t thingid[256];                // Coiiote client ID
     uint8_t thingpassword[64];           // Coiiote username
     uint8_t thingname[64];               // Coiiote password
     uint8_t workspace[64];               // Coiiote workspace
     gpio_num_t status_io;
-        gpio_num_t reset_io;
+    gpio_num_t reset_io;
 };
 
 static esp_coiiote_handle_t esp_coiite_handle = NULL;
@@ -213,7 +224,7 @@ static void get_mac_adress(void)
     mac_bytes_to_hexstr(mac, esp_coiite_handle->mac_str);
     ESP_LOGI(tag_coiiote, "MAC de fábrica (EFUSE_FACTORY) em string: %s\n", mac_str);
 }
-    
+
 esp_err_t esp_coiiote_init(esp_coiiote_config_t *config)
 {
     esp_err_t ret = ESP_OK;
@@ -231,38 +242,85 @@ esp_err_t esp_coiiote_init(esp_coiiote_config_t *config)
     memcpy(esp_coiiote->server, config->server, sizeof(esp_coiiote->server));
     esp_coiiote->port = config->port;
 
-    esp_coiiote->nvs_coiiote_handle = config->nvs_coiiote_handle;
+    // esp_coiiote->nvs_coiiote_handle = config->nvs_coiiote_handle;
     // ESP_GOTO_ON_ERROR(esp_coiiote->nvs_coiiote_handle, err, tag_coiiote, "Error to get NVS handle");
+
+    esp_nvs_config_t esp_nvs_coiiote_config = {
+        .name_space = "coiiote_nvs",
+        .key = "thingid",
+        .value_size = 256,
+    };
+
+    if (init_esp_nvs(&esp_nvs_coiiote_config, &esp_coiiote->nvs_coiiote_handle) == ESP_OK)
+    {
+        ESP_LOGI(tag_coiiote, "NVS for CoIIote Created Successfully");
+    }
+    else
+    {
+        ESP_LOGE(tag_coiiote, "NVS for CoIIote not created");
+    };
 
     char *generic_p = NULL;
     esp_nvs_change_key("thingid", esp_coiiote->nvs_coiiote_handle);
     if (esp_nvs_read_string(esp_coiiote->nvs_coiiote_handle, &generic_p) != ESP_OK)
     {
         ESP_LOGE(tag_coiiote, "Error to read Password");
+        esp_coiiote->thingid[0] = '\0'; // Initialize to empty string if read fails
     }
-    memcpy(esp_coiiote->thingid, generic_p, strlen(generic_p) + 1);
-
+    if (generic_p != NULL)
+    {
+         memcpy(esp_coiiote->thingid, generic_p, strlen(generic_p) + 1);
+    }
+    else
+    {
+        ESP_LOGW(tag_coiiote, "generic_p é NULL, ignorando memcpy.");
+    }
+   
     esp_nvs_change_key("thingpassword", esp_coiiote->nvs_coiiote_handle);
     if (esp_nvs_read_string(esp_coiiote->nvs_coiiote_handle, &generic_p) != ESP_OK)
     {
         ESP_LOGE(tag_coiiote, "Error to read Password");
+        esp_coiiote->thingpassword[0] = '\0'; // Initialize to empty string if read fails
     }
-    memcpy(esp_coiiote->thingpassword, generic_p, strlen(generic_p) + 1);
-
+    if (generic_p != NULL)
+    {
+        memcpy(esp_coiiote->thingpassword, generic_p, strlen(generic_p) + 1);
+    }
+    else
+    {
+        ESP_LOGW(tag_coiiote, "generic_p é NULL, ignorando memcpy.");
+    }
+    
     esp_nvs_change_key("thingname", esp_coiiote->nvs_coiiote_handle);
     if (esp_nvs_read_string(esp_coiiote->nvs_coiiote_handle, &generic_p) != ESP_OK)
     {
         ESP_LOGE(tag_coiiote, "Error to read Password");
+        esp_coiiote->thingname[0] = '\0'; // Initialize to empty string if read fails
     }
-    memcpy(esp_coiiote->thingname, generic_p, strlen(generic_p) + 1);
-
+    if (generic_p != NULL)
+    {
+            memcpy(esp_coiiote->thingname, generic_p, strlen(generic_p) + 1);
+    }
+    else
+    {
+        ESP_LOGW(tag_coiiote, "generic_p é NULL, ignorando memcpy.");
+    }
+   
     esp_nvs_change_key("workspace", esp_coiiote->nvs_coiiote_handle);
     if (esp_nvs_read_string(esp_coiiote->nvs_coiiote_handle, &generic_p) != ESP_OK)
     {
         ESP_LOGE(tag_coiiote, "Error to read Password");
+        esp_coiiote->workspace[0] = '\0'; // Initialize to empty string if read fails
     }
-    memcpy(esp_coiiote->workspace, generic_p, strlen(generic_p) + 1);
-
+    if (generic_p != NULL)
+    {
+        memcpy(esp_coiiote->workspace, generic_p, strlen(generic_p) + 1);
+    }
+    else
+    {
+        ESP_LOGW(tag_coiiote, "generic_p é NULL, ignorando memcpy.");
+    }
+    
     esp_coiite_handle = esp_coiiote;
 
     get_mac_adress();
@@ -326,10 +384,10 @@ void esp_coiiote_access()
         //.host = "192.168.1.12", //CONFIG_EXAMPLE_HTTP_ENDPOINT,
         //.port = 3000,
         .path = post_path,
-        .transport_type = HTTP_TRANSPORT_OVER_SSL, //HTTP_TRANSPORT_OVER_TCP,
+        .transport_type = HTTP_TRANSPORT_OVER_SSL, // HTTP_TRANSPORT_OVER_TCP,
         .user_data = local_response_buffer,
         .event_handler = _http_event_handler,
-        .cert_pem        = coiiote_cert_pem_start,
+        .cert_pem = coiiote_cert_pem_start,
 
     };
     esp_http_client_handle_t client = esp_http_client_init(&config);
@@ -404,7 +462,7 @@ void esp_coiiote_ota(const char *url)
     // começa aqui a parte de OTA
     esp_http_client_config_t config = {
         .url = url,
-        .cert_pem = (char *)coiiote_cert_pem_start, 
+        .cert_pem = (char *)coiiote_cert_pem_start,
         .event_handler = _http_event_handler_ota,
         .keep_alive_enable = true,
     };
@@ -425,5 +483,399 @@ void esp_coiiote_ota(const char *url)
     else
     {
         ESP_LOGE(tag_coiiote, "Firmware upgrade failed");
+    }
+}
+
+// webserver
+//  convert a hex digit to its integer value
+static char from_hex(char ch)
+{
+    if (isdigit((unsigned char)ch))
+        return ch - '0';
+    if (isupper((unsigned char)ch))
+        return ch - 'A' + 10;
+    return ch - 'a' + 10;
+}
+
+// decod percent‑encoding (URL) acording to RFC 3986
+// https://datatracker.ietf.org/doc/html/rfc3986#section-2.1
+static void url_decode(char *dst, const char *src)
+{
+    while (*src)
+    {
+        if (*src == '%' && isxdigit((unsigned char)src[1]) && isxdigit((unsigned char)src[2]))
+        {
+            *dst++ = from_hex(src[1]) << 4 | from_hex(src[2]);
+            src += 3;
+        }
+        else if (*src == '+')
+        {
+            *dst++ = ' ';
+            src++;
+        }
+        else
+        {
+            *dst++ = *src++;
+        }
+    }
+    *dst = '\0';
+}
+
+/* An HTTP GET handler */
+static esp_err_t getssid_get_handler(httpd_req_t *req)
+{
+    char *buf;
+    size_t buf_len;
+
+    /* Get header value string length and allocate memory for length + 1,
+     * extra byte for null termination */
+    buf_len = httpd_req_get_hdr_value_len(req, "Host") + 1;
+    if (buf_len > 1)
+    {
+        buf = malloc(buf_len);
+        ESP_RETURN_ON_FALSE(buf, ESP_ERR_NO_MEM, tag_coiiote, "buffer alloc failed");
+        /* Copy null terminated value string into buffer */
+        if (httpd_req_get_hdr_value_str(req, "Host", buf, buf_len) == ESP_OK)
+        {
+            ESP_LOGI(tag_coiiote, "Found header => Host: %s", buf);
+        }
+        free(buf);
+    }
+
+    buf_len = httpd_req_get_hdr_value_len(req, "Test-Header-2") + 1;
+    if (buf_len > 1)
+    {
+        buf = malloc(buf_len);
+        ESP_RETURN_ON_FALSE(buf, ESP_ERR_NO_MEM, tag_coiiote, "buffer alloc failed");
+        if (httpd_req_get_hdr_value_str(req, "Test-Header-2", buf, buf_len) == ESP_OK)
+        {
+            ESP_LOGI(tag_coiiote, "Found header => Test-Header-2: %s", buf);
+        }
+        free(buf);
+    }
+
+    buf_len = httpd_req_get_hdr_value_len(req, "Test-Header-1") + 1;
+    if (buf_len > 1)
+    {
+        buf = malloc(buf_len);
+        ESP_RETURN_ON_FALSE(buf, ESP_ERR_NO_MEM, tag_coiiote, "buffer alloc failed");
+        if (httpd_req_get_hdr_value_str(req, "Test-Header-1", buf, buf_len) == ESP_OK)
+        {
+            ESP_LOGI(tag_coiiote, "Found header => Test-Header-1: %s", buf);
+        }
+        free(buf);
+    }
+
+    /* Read URL query string length and allocate memory for length + 1,
+     * extra byte for null termination */
+    buf_len = httpd_req_get_url_query_len(req) + 1;
+    if (buf_len > 1)
+    {
+        buf = malloc(buf_len);
+        ESP_RETURN_ON_FALSE(buf, ESP_ERR_NO_MEM, tag_coiiote, "buffer alloc failed");
+        if (httpd_req_get_url_query_str(req, buf, buf_len) == ESP_OK)
+        {
+            ESP_LOGI(tag_coiiote, "Found URL query => %s", buf);
+            char param[EXAMPLE_HTTP_QUERY_KEY_MAX_LEN], dec_param[EXAMPLE_HTTP_QUERY_KEY_MAX_LEN] = {0};
+            /* Get value of expected key from query string */
+            if (httpd_query_key_value(buf, "query1", param, sizeof(param)) == ESP_OK)
+            {
+                ESP_LOGI(tag_coiiote, "Found URL query parameter => query1=%s", param);
+                example_uri_decode(dec_param, param, strnlen(param, EXAMPLE_HTTP_QUERY_KEY_MAX_LEN));
+                ESP_LOGI(tag_coiiote, "Decoded query parameter => %s", dec_param);
+            }
+            if (httpd_query_key_value(buf, "query3", param, sizeof(param)) == ESP_OK)
+            {
+                ESP_LOGI(tag_coiiote, "Found URL query parameter => query3=%s", param);
+                example_uri_decode(dec_param, param, strnlen(param, EXAMPLE_HTTP_QUERY_KEY_MAX_LEN));
+                ESP_LOGI(tag_coiiote, "Decoded query parameter => %s", dec_param);
+            }
+            if (httpd_query_key_value(buf, "query2", param, sizeof(param)) == ESP_OK)
+            {
+                ESP_LOGI(tag_coiiote, "Found URL query parameter => query2=%s", param);
+                example_uri_decode(dec_param, param, strnlen(param, EXAMPLE_HTTP_QUERY_KEY_MAX_LEN));
+                ESP_LOGI(tag_coiiote, "Decoded query parameter => %s", dec_param);
+            }
+        }
+        free(buf);
+    }
+
+    /* Set some custom headers */
+    httpd_resp_set_hdr(req, "Custom-Header-1", "Custom-Value-1");
+    httpd_resp_set_hdr(req, "Custom-Header-2", "Custom-Value-2");
+
+    char thingid[64];
+    char *p = NULL;
+    esp_nvs_change_key("thingid", esp_coiite_handle->nvs_coiiote_handle);
+    if (esp_nvs_read_string(esp_coiite_handle->nvs_coiiote_handle, &p) != ESP_OK)
+    {
+        thingid[0] = '\0';
+        ESP_LOGW(tag_coiiote, "Error to read Thing-ID");
+    }
+    else
+    {
+        strcpy(thingid, p);
+    }
+
+    char thingname[64];
+    esp_nvs_change_key("thingname", esp_coiite_handle->nvs_coiiote_handle);
+    if (esp_nvs_read_string(esp_coiite_handle->nvs_coiiote_handle, &p) != ESP_OK)
+    {
+        thingname[0] = '\0';
+        ESP_LOGW(tag_coiiote, "Error to read Thing-NAME");
+    }
+    else
+    {
+        strcpy(thingname, p);
+    }
+
+    char workspace[64];
+    esp_nvs_change_key("workspace", esp_coiite_handle->nvs_coiiote_handle);
+    if (esp_nvs_read_string(esp_coiite_handle->nvs_coiiote_handle, &p) != ESP_OK)
+    {
+        workspace[0] = '\0';
+        ESP_LOGW(tag_coiiote, "Error to read WORKSPACE");
+    }
+    else
+    {
+        strcpy(workspace, p);
+    }
+
+    static char wifi_form_html[2048];
+
+    sprintf(wifi_form_html,
+            "<!DOCTYPE html>"
+            "<html>"
+            "<head>"
+            "<style>"
+            "body {  margin: 0;  padding: 0;  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;  background: linear-gradient(135deg, #e0eafc, #cfdef3);  display: flex;  flex-direction: column;  align-items: center;}"
+            ".container {  text-align: center;  background: white;  padding: 40px 60px;  border-radius: 16px;  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);}"
+            ".form-group {  margin: 10px 0;  width: 100%%;  max-width: 400px;  text-align: left; }"
+            "input {  width: 100%%;  padding: 10px;  font-size: 1rem;  margin-top: 5px;  border: 1px solid #ccc;  border-radius: 4px;}"
+            "button {  width: 100%%;  padding: 12px;  background-color: #007bff;  color: white;  border: none;  border-radius: 4px;  font-size: 1rem;  cursor: pointer;  margin-top: 10px; }"
+            "</style>"
+            "</head>"
+            "<body>"
+            "<div class=\"container\">"
+            "<h2>CoIIoTe</h2>"
+            "<form action=\"/savessid\" method=\"post\">"
+            "Thing-ID: <input name=\"thingid\" type=\"text\" value=\"%s\"><br>"
+            "Thing-Name: <input name=\"thingname\" type=\"text\" value=\"%s\"><br>"
+            "Thing-Password: <input name=\"thingpassword\" type=\"password\"> <br>"
+            "Workspace: <input name=\"workspace\" type=\"text\" value=\"%s\"><br><br>"
+            "<button type=\"submit\">Enviar</button>"
+            "</form>"
+            "</div>"
+            "</body></html>",
+            thingid, thingname, workspace);
+
+    /* Send response with custom headers and body set as the
+     * string passed in user context*/
+    const char *resp_str = (const char *)wifi_form_html;
+    httpd_resp_send(req, resp_str, HTTPD_RESP_USE_STRLEN);
+
+    /* After sending the HTTP response the old HTTP request
+     * headers are lost. Check if HTTP request headers can be read now. */
+    if (httpd_req_get_hdr_value_len(req, "Host") == 0)
+    {
+        ESP_LOGI(tag_coiiote, "Request headers lost");
+    }
+    return ESP_OK;
+}
+
+static const httpd_uri_t getssid = {
+    .uri = "/getssid",
+    .method = HTTP_GET,
+    .handler = getssid_get_handler,
+    /* Let's pass response string in user
+     * context to demonstrate it's usage */
+    .user_ctx = NULL};
+
+/* An HTTP POST handler */
+static esp_err_t savessid_post_handler(httpd_req_t *req)
+{
+    char buf[1000];
+    int ret, remaining = req->content_len;
+
+    // void *ctx = httpd_get_global_user_ctx(req->handle);
+    // esp_coiiote_handle_t handle = (esp_coiiote_handle_t)ctx;
+
+    while (remaining > 0)
+    {
+        /* Read the data for the request */
+        if ((ret = httpd_req_recv(req, buf,
+                                  MIN(remaining, sizeof(buf)))) <= 0)
+        {
+            if (ret == HTTPD_SOCK_ERR_TIMEOUT)
+            {
+                /* Retry receiving if timeout occurred */
+                continue;
+            }
+            return ESP_FAIL;
+        }
+
+        /* Send back the same data */
+        httpd_resp_send_chunk(req, buf, ret);
+        remaining -= ret;
+
+        /* Log data received */
+        ESP_LOGI(tag_coiiote, "=========== RECEIVED DATA ==========");
+        ESP_LOGI(tag_coiiote, "%.*s", ret, buf);
+        ESP_LOGI(tag_coiiote, "====================================");
+
+        char *saveptr1, *saveptr2;
+        char *str = strndup(buf, ret);
+        char *pair = strtok_r(str, "&", &saveptr1);
+        while (pair)
+        {
+            char *key = strtok_r(pair, "=", &saveptr2);
+            char *value = strtok_r(NULL, "=", &saveptr2);
+            printf("Chave: %s, Valor: %s\n", key, value);
+            pair = strtok_r(NULL, "&", &saveptr1);
+            // test
+            if (strcmp(key, "thingid") == 0)
+            {
+                esp_nvs_change_key("thingid", esp_coiite_handle->nvs_coiiote_handle);
+                char thingid[256];
+                url_decode(thingid, value);
+                esp_nvs_write_string(thingid, esp_coiite_handle->nvs_coiiote_handle);
+            }
+            else if (strcmp(key, "thingname") == 0)
+            {
+                esp_nvs_change_key("thingname", esp_coiite_handle->nvs_coiiote_handle);
+                char thingname[100];
+                url_decode(thingname, value);
+                esp_nvs_write_string(thingname, esp_coiite_handle->nvs_coiiote_handle);
+            }
+            else if (strcmp(key, "thingpassword") == 0)
+            {
+                esp_nvs_change_key("thingpassword", esp_coiite_handle->nvs_coiiote_handle);
+                char thingpassword[100];
+                url_decode(thingpassword, value);
+                esp_nvs_write_string(thingpassword, esp_coiite_handle->nvs_coiiote_handle);
+            }
+            else if (strcmp(key, "workspace") == 0)
+            {
+                esp_nvs_change_key("workspace", esp_coiite_handle->nvs_coiiote_handle);
+                char workspace[100];
+                url_decode(workspace, value);
+                esp_nvs_write_string(workspace, esp_coiite_handle->nvs_coiiote_handle);
+            }
+            else
+            {
+                ESP_LOGI(tag_coiiote, "Chave não reconhecida: %s", key);
+            }
+        }
+        free(str);
+
+        // salva na memória
+    }
+
+    // End response
+    httpd_resp_send_chunk(req, NULL, 0);
+    return ESP_OK;
+}
+
+static const httpd_uri_t savessid = {
+    .uri = "/savessid",
+    .method = HTTP_POST,
+    .handler = savessid_post_handler,
+    .user_ctx = NULL};
+
+static esp_err_t http_404_error_handler(httpd_req_t *req, httpd_err_code_t err)
+{
+    if (strcmp("/getssid", req->uri) == 0)
+    {
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "/getssid URI is not available");
+        /* Return ESP_OK to keep underlying socket open */
+        return ESP_OK;
+    }
+    else if (strcmp("/savessid", req->uri) == 0)
+    {
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "/savessid URI is not available");
+        /* Return ESP_FAIL to close underlying socket */
+        return ESP_FAIL;
+    }
+    /* For any other URI send 404 and close socket */
+    httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Some 404 error message");
+    return ESP_FAIL;
+}
+
+static esp_err_t stop_webserver(httpd_handle_t server)
+{
+    // Stop the httpd server
+    return httpd_stop(server);
+}
+
+static httpd_handle_t start_webserver()
+{
+    httpd_handle_t server = NULL;
+    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    config.lru_purge_enable = true;
+
+    // Start the httpd server
+    ESP_LOGI(tag_coiiote, "Starting server on port: '%d'", config.server_port);
+
+    if (httpd_start(&server, &config) == ESP_OK)
+    {
+        // Set URI handlers
+        ESP_LOGI(tag_coiiote, "Registering URI handlers");
+        httpd_register_uri_handler(server, &getssid);
+        httpd_register_uri_handler(server, &savessid);
+        return server;
+    }
+
+    ESP_LOGI(tag_coiiote, "Error starting server!");
+    return NULL;
+}
+
+static void disconnect_handler(void *arg, esp_event_base_t event_base,
+                               int32_t event_id, void *event_data)
+{
+    httpd_handle_t *server = (httpd_handle_t *)arg;
+    if (*server)
+    {
+        ESP_LOGI(tag_coiiote, "Stopping webserver");
+        if (stop_webserver(*server) == ESP_OK)
+        {
+            *server = NULL;
+        }
+        else
+        {
+            ESP_LOGE(tag_coiiote, "Failed to stop http server");
+        }
+    }
+}
+
+static void connect_handler(void *arg, esp_event_base_t event_base,
+                            int32_t event_id, void *event_data)
+{
+    esp_coiiote_handle_t handle = (esp_coiiote_handle_t)arg;
+    // httpd_handle_t *server = (httpd_handle_t *)arg;
+    printf("handle no connect: %p\n", handle);
+    if (handle->web_server == NULL)
+    {
+        ESP_LOGI(tag_coiiote, "Starting webserver");
+        handle->web_server = start_webserver();
+    }
+}
+
+void esp_coiiote_webserver_init()
+{
+
+    esp_coiite_handle->web_server = NULL;
+
+    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &connect_handler, esp_coiite_handle));
+    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &disconnect_handler, &esp_coiite_handle->web_server));
+
+    esp_coiite_handle->web_server = start_webserver();
+
+    if (esp_coiite_handle->web_server == NULL)
+    {
+        ESP_LOGE(tag_coiiote, "Failed to start webserver");
+    }
+    else
+    {
+        ESP_LOGI(tag_coiiote, "Webserver started successfully");
     }
 }

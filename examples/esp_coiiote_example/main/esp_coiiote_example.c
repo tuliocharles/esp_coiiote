@@ -84,7 +84,6 @@ void app_main(void)
     esp_coiiote_config_t coiiote_config = {
         .server = HOST,
         .port = 443,
-        .nvs_coiiote_handle = esp_wifi_get_coiiote_nvs_handle(),
     };
     esp_coiiote_init(&coiiote_config);
 
@@ -100,6 +99,8 @@ void app_main(void)
     esp_coiiote_debug();
 
     xTaskCreate(&http_test_task, "http_test_task", 8192, NULL, 5, NULL);
+
+    esp_coiiote_webserver_init();
 
     uint64_t cont = 0; // Counter for the number of messages sent
 

@@ -1,6 +1,6 @@
 dependencies:
   tuliocharles/esp_coiiote:
-    version: "*"
+    version: ">=0.0.4"
     # for local developmente, use the local
     # copy of the component
     # override_path: "../../../"
@@ -11,6 +11,6 @@ dependencies:
     rules:
       - if: "target in [esp32p4, esp32h2]"
   tuliocharles/esp_wifi_interface:
-      version: '*'
+      version: '>=0.0.8'
   tuliocharles/esp_mqtt_interface:
       version: '*'

@@ -33,4 +33,6 @@ uint8_t* esp_coiiote_get_thingname(void);
 
 void esp_coiiote_ota(const char *url);
 
+void esp_coiiote_webserver_init();
+
 #endif
