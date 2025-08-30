@@ -35,4 +35,11 @@ void esp_coiiote_ota(const char *url);
 
 void esp_coiiote_webserver_init();
 
+void esp_coiiote_write_config(const char *value);
+
+void esp_coiiote_config();
+
+void esp_local_ip(const char *ip);
+
+
 #endif

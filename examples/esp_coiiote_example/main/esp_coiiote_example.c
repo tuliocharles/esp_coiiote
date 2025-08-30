@@ -61,8 +61,12 @@ static void evento_mqtt(uint32_t received_id, const char *topic, const char *dat
 
 static void http_test_task(void *pvParameters)
 {
+    
+    
     // http_rest_with_hostname_path(); // HTTP REST API example
     esp_coiiote_access(); // Send data to CoIIoTe server
+
+    esp_coiiote_config(); // send configuration to CoIIoTe server
 
     vTaskDelete(NULL); // Delete the task after completion
 }
@@ -87,6 +91,9 @@ void app_main(void)
     };
     esp_coiiote_init(&coiiote_config);
 
+    //save ip
+    esp_local_ip(WiFiGetLocalIP());
+
     esp_mqtt_interface_config_t client_mqtt = {
         .host = HOST,
         .port = 1883,
@@ -98,16 +105,16 @@ void app_main(void)
     esp_mqtt_interface_register_cb(evento_mqtt);
     esp_coiiote_debug();
 
-    xTaskCreate(&http_test_task, "http_test_task", 8192, NULL, 5, NULL);
+    xTaskCreate(&http_test_task, "http_test_task", 10000, NULL, 5, NULL);
 
     esp_coiiote_webserver_init();
 
     uint64_t cont = 0; // Counter for the number of messages sent
 
-            while (1)
+    while (1)
     {
 
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        vTaskDelay(10000 / portTICK_PERIOD_MS);
         esp_wifi_check_reset_button();
 
         cont++;
@@ -116,7 +123,7 @@ void app_main(void)
                  (char *)esp_coiiote_get_workspace(),
                  (char *)esp_coiiote_get_thingname()); // Construct the topic using MAC address, thing name, and workspace
         char data[50];
-        snprintf(data, sizeof(data), "%llu seconds", cont);
-        //esp_mqtt_interface_publish(topic, data, 0, 0);
+        snprintf(data, sizeof(data), "%llu", cont);
+        esp_mqtt_interface_publish(topic, data, 0, 0);
     }
 }
