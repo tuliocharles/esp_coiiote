@@ -1,6 +1,6 @@
 dependencies:
   tuliocharles/esp_coiiote:
-    version: ">=0.0.4"
+    version: ">=0.0.6"
     # for local developmente, use the local
     # copy of the component
     # override_path: "../../../"

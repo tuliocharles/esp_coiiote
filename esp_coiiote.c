@@ -281,7 +281,7 @@ esp_err_t esp_coiiote_init(esp_coiiote_config_t *config)
     esp_nvs_config_t esp_nvs_coiiote_config = {
         .name_space = "coiiote_nvs",
         .key = "thingid",
-        .value_size = 256,
+        .value_size = 1024,
     };
 
     if (init_esp_nvs(&esp_nvs_coiiote_config, &esp_coiiote->nvs_coiiote_handle) == ESP_OK)

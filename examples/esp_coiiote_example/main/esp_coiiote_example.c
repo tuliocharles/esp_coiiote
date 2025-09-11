@@ -61,8 +61,7 @@ static void evento_mqtt(uint32_t received_id, const char *topic, const char *dat
 
 static void http_test_task(void *pvParameters)
 {
-    
-    
+        
     // http_rest_with_hostname_path(); // HTTP REST API example
     esp_coiiote_access(); // Send data to CoIIoTe server
 
