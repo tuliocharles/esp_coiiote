@@ -41,5 +41,6 @@ void esp_coiiote_config();
 
 void esp_local_ip(const char *ip);
 
+void esp_coiiote_send_txt_from_sdcard(int file_size, FILE *f);
 
 #endif

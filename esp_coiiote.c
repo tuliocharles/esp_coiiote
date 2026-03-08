@@ -1287,3 +1287,71 @@ void esp_local_ip(const char *ip)
 {
     sprintf(esp_coiiote_handle->local_ip, "%s", ip);
 }
+
+void esp_coiiote_send_txt_from_sdcard(int file_size, FILE *f)
+{
+
+    char post_path[100];
+    snprintf(post_path, sizeof(post_path), "/device/%s/upload", esp_coiiote_handle->mac_str);
+    ESP_LOGI(tag_coiiote, "POST path: %s", post_path);
+    ESP_LOGI(tag_coiiote, "Server: %s", esp_coiiote_handle->server);
+    ESP_LOGI(tag_coiiote, "Port: %d", esp_coiiote_handle->port);
+    ESP_LOGI(tag_coiiote, "Path: %s", post_path);
+    ESP_LOGI(tag_coiiote, "File size: %d", file_size);
+    
+    char local_response_buffer[MAX_HTTP_OUTPUT_BUFFER + 1] = {0};
+
+    esp_http_client_config_t config = {
+        .host = (const char *)esp_coiiote_handle->server, // CONFIG_EXAMPLE_HTTP_ENDPOINT,
+        .port = esp_coiiote_handle->port,
+        .path = post_path,
+        .transport_type = HTTP_TRANSPORT_OVER_SSL, // HTTP_TRANSPORT_OVER_TCP,
+        .user_data = local_response_buffer,
+        .event_handler = _http_event_handler,
+        .cert_pem = coiiote_cert_pem_start,
+
+    };
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+
+    esp_http_client_set_method(client, HTTP_METHOD_POST);
+    esp_http_client_set_header(client, "Content-Type", "text/csv");
+
+    esp_err_t err = esp_http_client_open(client, (int)file_size);
+
+    // buffer para leitura em blocos (1KB recomendado)
+    size_t chunk_buf_size = 1024;
+    size_t buf_size = chunk_buf_size ? chunk_buf_size : 1024;
+    char *buf = malloc(buf_size);
+   
+    size_t read_bytes;
+    size_t total_sent = 0;
+    while ((read_bytes = fread(buf, 1, buf_size, f)) > 0) {
+        ESP_LOGI(tag_coiiote, "read %d bytes", read_bytes);
+        int written = esp_http_client_write(client, buf, read_bytes);
+         ESP_LOGI(tag_coiiote, "written %d bytes", written);
+        total_sent += written;
+        // opcional: log progress
+        // ESP_LOGI(TAG, "sent %u/%ld", total_sent, file_size);
+    }
+
+    free(buf);
+
+    int content_length = esp_http_client_fetch_headers(client);
+
+    if (err == ESP_OK)
+    {
+        ESP_LOGI(tag_coiiote, "HTTP POST Status = %d, content_length = %" PRId64,
+                 esp_http_client_get_status_code(client),
+                 esp_http_client_get_content_length(client));
+    }
+    else
+    {
+        ESP_LOGE(tag_coiiote, "HTTP POST request failed: %s", esp_err_to_name(err));
+    }
+
+
+    ESP_LOG_BUFFER_HEX(tag_coiiote, local_response_buffer, strlen(local_response_buffer));
+    ESP_LOGI(tag_coiiote, "HTTP Response (JSON):\n%s", local_response_buffer);
+
+    esp_http_client_cleanup(client);
+}
