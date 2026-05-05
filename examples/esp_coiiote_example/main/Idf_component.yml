@@ -1,6 +1,6 @@
 dependencies:
   tuliocharles/esp_coiiote:
-    version: ">=0.0.8"
+    version: ">=0.0.9"
     # for local developmente, use the local
     # copy of the component
     # override_path: "../../../"
@@ -13,4 +13,4 @@ dependencies:
   tuliocharles/esp_wifi_interface:
       version: '>=0.0.10'
   tuliocharles/esp_mqtt_interface:
-      version: '>=0.0.1'
+      version: '>=0.1.0'

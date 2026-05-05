@@ -9,13 +9,13 @@ maintainers:
   - "Túlio Carvalho <tulio.cefetmg@gmail.com>"
 
 dependencies:
-  idf: ">=5.5"
+  idf: ">=6"
   espressif/esp_wifi_remote:
     version: ">=0.1.12"
     rules:
       - if: "target in [esp32p4, esp32h2]"
   tuliocharles/esp_nvs: 
-    version: '>=0.0.2'
+    version: '>=0.0.3'
 
 files:
   excludes:

@@ -93,6 +93,9 @@ static esp_err_t _http_event_handler_ota(esp_http_client_event_t *evt)
     case HTTP_EVENT_REDIRECT:
         ESP_LOGD("http", "HTTP_EVENT_REDIRECT");
         break;
+    default:
+        ESP_LOGD("http", "HTTP_EVENT_UNKNOWN");
+        break;
     }
     return ESP_OK;
 }
@@ -198,7 +201,12 @@ static esp_err_t _http_event_handler(esp_http_client_event_t *evt)
         esp_http_client_set_header(evt->client, "Accept", "text/html");
         esp_http_client_set_redirection(evt->client);
         break;
+    default:
+        ESP_LOGD(tag_coiiote, "HTTP_EVENT_UNKNOWN");
+        break;
     }
+    
+    
     return ESP_OK;
 }
 
