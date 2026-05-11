@@ -9,7 +9,7 @@ maintainers:
   - "Túlio Carvalho <tulio.cefetmg@gmail.com>"
 
 dependencies:
-  idf: ">=6"
+  idf: ">=5"
   espressif/esp_wifi_remote:
     version: ">=0.1.12"
     rules:
